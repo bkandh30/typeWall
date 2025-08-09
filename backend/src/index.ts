@@ -10,6 +10,31 @@ const app = new Hono<{
   }
 }>()
 
+async function hashPassword(password: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const saltHex = Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('');
+  
+  const passwordData = encoder.encode(password + saltHex);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', passwordData);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  
+  return saltHex + ':' + hashHex;
+}
+
+async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
+  const [saltHex, hash] = storedHash.split(':');
+  
+  const encoder = new TextEncoder();
+  const passwordData = encoder.encode(password + saltHex);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', passwordData);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const computedHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  
+  return computedHash === hash;
+}
+
 app.use('/api/v1/blog/*', async (c, next) => {
   const jwt = c.req.header('Authorization');
   if (!jwt) {
@@ -17,7 +42,7 @@ app.use('/api/v1/blog/*', async (c, next) => {
     return c.json({ error: "unauthorized" });
   }
 
-  const token = jwt.split('')[1];
+  const token = jwt.split(' ')[1];
   const payload = await verify(token, c.env.JWT_SECRET);
   if (!payload) {
     c.status(401);
@@ -34,10 +59,12 @@ app.post('/api/v1/signup', async (c) => {
   const body = await c.req.json();
   
   try {
+    const hashedPassword = await hashPassword(body.password);
+
     const user = await prisma.user.create({
       data: {
         email: body.email,
-        password: body.password
+        password: hashedPassword
       }
     });
 
@@ -66,6 +93,8 @@ app.post('/api/v1/signin', async (c) => {
     return c.json({ error: "User not found"});
   }
 
+  const isValidPassword = await verifyPassword(body.password, user.password);
+
   const jwt = await sign({ id: user.id }, c.env.JWT_SECRET);
   return c.json({ jwt });
 })
@@ -77,11 +106,11 @@ app.get('/api/v1/blog/:id', (c) => {
 })
 
 app.post('/api/v1/blog', (c) => {
-  return c.text('Signin Post Route')
+  return c.text('Create Blog Route')
 })
 
 app.put('/api/v1/blog', (c) => {
-  return c.text('Signin Put Route')
+  return c.text('Update Blog Route')
 })
 
 export default app
