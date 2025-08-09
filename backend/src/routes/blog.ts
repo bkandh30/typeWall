@@ -26,16 +26,32 @@ blogRouter.use('/*', async (c, next) => {
   await next()
 })
 
-blogRouter.get('/api/v1/blog/:id', (c) => {
+blogRouter.get('/:id', (c) => {
   const id = c.req.param('id')
   console.log(id);
   return c.text('Get Blog Route')
 })
 
-blogRouter.post('/api/v1/blog', (c) => {
-  return c.text('Create Blog Route')
+blogRouter.post('/', async (c) => {
+  const userId = c.get('userId');
+  const prisma = new PrismaClient({
+    datasourceUrl: c.env?.DATABASE_URL,
+  }).$extends(withAccelerate());
+
+  const body = await c.req.json();
+  const post = await prisma.post.create({
+    data: {
+      title: body.title,
+      content: body.content,
+      authorId: userId
+    }
+  });
+
+  return c.json({
+    id: post.id
+  });
 })
 
-blogRouter.put('/api/v1/blog', (c) => {
+blogRouter.put('/', (c) => {
   return c.text('Update Blog Route')
 })
