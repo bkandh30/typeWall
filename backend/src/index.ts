@@ -29,12 +29,29 @@ app.post('/api/v1/signup', async (c) => {
     return c.json({ jwt });
   } catch (e) {
     c.status(403);
-    return c.json({ error:"error while signing up"});
+    return c.json({ error: "Error while signing up"});
   }
 })
 
-app.post('/api/v1/signin', (c) => {
-  return c.text('Signin Route')
+app.post('/api/v1/signin', async (c) => {
+  const prisma = new PrismaClient({
+    datasourceUrl: c.env.DATABASE_URL,
+  }).$extends(withAccelerate())
+
+  const body = await c.req.json();
+  const user = await prisma.user.findUnique({
+    where: {
+      email: body.email
+    }
+  });
+
+  if (!user) {
+    c.status(403);
+    return c.json({ error: "User not found"});
+  }
+
+  const jwt = await sign({ id: user.id }, c.env.JWT_SECRET);
+  return c.json({ jwt });
 })
 
 app.get('/api/v1/blog/:id', (c) => {
