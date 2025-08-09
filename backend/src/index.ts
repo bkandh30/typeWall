@@ -8,11 +8,25 @@ const app = new Hono<{
   }
 }>()
 
-app.post('/api/v1/signup', (c) => {
+app.post('/api/v1/signup', async (c) => {
   const prisma = new PrismaClient({
     datasourceUrl: c.env.DATABASE_URL,
   }).$extends(withAccelerate())
-  return c.text('Signup Route')
+
+  const body = await c.req.json();
+  
+  try {
+    const user = await prisma.user.create({
+      data: {
+        email: body.email,
+        password: body.password
+      }
+    });
+
+    return c.text('jwt here')
+  } catch (e) {
+    return c.status(403);
+  }
 })
 
 app.post('/api/v1/signin', (c) => {
