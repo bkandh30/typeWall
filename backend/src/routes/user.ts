@@ -2,6 +2,7 @@ import { PrismaClient } from "@prisma/client/extension";
 import { withAccelerate } from "@prisma/extension-accelerate";
 import { Hono } from "hono";
 import { sign } from "hono/jwt";
+import { signupInput, signinInput } from "@bkandh30/common-blog-app";
 
 export const userRouter = new Hono<{
     Bindings: {
@@ -36,28 +37,38 @@ async function verifyPassword(password: string, storedHash: string): Promise<boo
 }
 
 
-userRouter.post('/api/v1/signup', async (c) => {
+userRouter.post('/signup', async (c) => {
+  const body = await c.req.json();
+  const { success } = signupInput.safeParse(body);
+  if (!success) {
+    c.status(411);
+    return c.json({
+      message: "Inputs are incorrect"
+    })
+  }
+
+
   const prisma = new PrismaClient({
     datasourceUrl: c.env.DATABASE_URL,
   }).$extends(withAccelerate())
-
-  const body = await c.req.json();
   
   try {
     const hashedPassword = await hashPassword(body.password);
 
     const user = await prisma.user.create({
       data: {
-        email: body.email,
-        password: hashedPassword
+        username: body.username,
+        password: hashedPassword,
+        name: body.name
       }
     });
 
     const jwt = await sign({ id: user.id}, c.env.JWT_SECRET);
     return c.json({ jwt });
   } catch (e) {
-    c.status(403);
-    return c.json({ error: "Error while signing up"});
+    console.log(e);
+    c.status(411);
+    return c.json({ error: "Invalid Credentials!"});
   }
 })
 
