@@ -1,7 +1,7 @@
 import { PrismaClient } from "@prisma/client/extension";
 import { withAccelerate } from "@prisma/extension-accelerate";
 import { Hono } from "hono";
-import { sign, verify} from "hono/jwt";
+import { sign } from "hono/jwt";
 
 export const userRouter = new Hono<{
     Bindings: {
