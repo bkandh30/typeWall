@@ -83,21 +83,45 @@ blogRouter.get('/bulk', async (c) => {
     datasourceUrl: c.env.DATABASE_URL,
   }).$extends(withAccelerate())
 
-  const blogs = await prisma.blog.findMany({
-    select: {
-      content: true,
-      title: true,
-      id: true,
-      author: {
-        select: {
-          name: true
+  const page = parseInt(c.req.query('page') || '1');
+  const limit = 10;
+  const skip = (page-1) * limit;
+
+  const [blogs, totalCount] = await Promise.all([
+    prisma.blog.findMany({
+      skip: skip,
+      take: limit,
+      select: {
+        content: true,
+        title: true,
+        id: true,
+        author: {
+          select: {
+            name: true
+          }
         }
+      },
+      orderBy: {
+        id: 'desc'
       }
-    }
-  });
+    }),
+    prisma.blog.count()
+  ]);
+
+  const totalPages = Math.ceil(totalCount/limit);
+  const hasNextPage = page < totalPages;
+  const hasPrevPage = page > 1;
 
   return c.json({
-    blogs
+    blogs,
+    pagination: {
+      currentPage: page,
+      totalPages: totalPages,
+      totalCount: totalCount,
+      hasNextPage: hasNextPage,
+      hasPrevPage: hasPrevPage,
+      limit: limit
+    }
   })
 })
 
