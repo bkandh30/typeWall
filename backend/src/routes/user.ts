@@ -73,25 +73,51 @@ userRouter.post('/signup', async (c) => {
 })
 
 
-userRouter.post('/api/v1/signin', async (c) => {
+userRouter.post('/signin', async (c) => {
+  const body = await c.req.json();
+  const { success } = signinInput.safeParse(body);
+  if (!success) {
+    c.status(411);
+    return c.json({
+      message: "Inputs are incorrect"
+    })
+  }
+
   const prisma = new PrismaClient({
     datasourceUrl: c.env.DATABASE_URL,
   }).$extends(withAccelerate())
 
-  const body = await c.req.json();
-  const user = await prisma.user.findUnique({
-    where: {
-      email: body.email
+  try {
+    const user = await prisma.user.findUnique({
+      where: {
+        username: body.username,
+      }
+    })
+
+    if (!user) {
+      c.status(403);
+      return c.json({
+        message: "Incorrect Credentials"
+      })
     }
-  });
 
-  if (!user) {
-    c.status(403);
-    return c.json({ error: "User not found"});
+    const isValidPassword = await verifyPassword(body.password, user.password);
+    if (!isValidPassword) {
+      c.status(403);
+      return c.json({
+        message: "Incorrect Credentials"
+      })
+    }
+
+    const jwt = await sign({
+      id: user.id
+    }, c.env.JWT_SECRET)
+    return c.json({ jwt })
+  } catch(e) {
+    console.log(e);
+    c.status(411);
+    return c.json({
+      error: "Invalid Credentials"
+    })
   }
-
-  const isValidPassword = await verifyPassword(body.password, user.password);
-
-  const jwt = await sign({ id: user.id }, c.env.JWT_SECRET);
-  return c.json({ jwt });
 })
